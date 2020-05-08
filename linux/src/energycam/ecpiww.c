@@ -359,6 +359,8 @@ int Log2File(char *DataPath, uint16_t mode, uint16_t meterindex, uint16_t infofl
     time_t t;
     struct tm curtime;
 
+    if(infoflag > SILENTMODE) printf("mode %d, datapath %s, meter value %f \n", mode, DataPath, metervalue);
+
     switch(mode) {
         case LOGTOCSV : if (strlen(DataPath) == 0) {
                             sprintf(param, "/var/www/ecpiww/data/ecpiwwM%d.csv", meterindex+1);

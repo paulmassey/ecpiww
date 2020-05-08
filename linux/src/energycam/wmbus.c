@@ -792,7 +792,7 @@ bool wMBus_IsInArray(ecwMBUSMeter p, ecwMBUSMeter MeterData[],int *Index) {
     if((p.manufacturerID == 0) || (p.ident == 0)) return false;
 
     for(i=0;i<MAXSLOT;i++) {
-        if( MeterData[i].manufacturerID==p.manufacturerID && MeterData[i].ident==p.ident && MeterData[i].version==p.version && MeterData[i].type==p.type) {
+        if( MeterData[i].ident==p.ident && MeterData[i].type==p.type) {
             break;
         }
     }
@@ -951,7 +951,9 @@ void GetDataFromStick(unsigned long handle, uint16_t stick, uint16_t infoflag) {
         //30 encrypted
 
         if((PayLoadLength < WMBUS_PAYLOADLENGTH_ENCRYPTED) || bIsDecrypted ) {
-            if((WMBUS_MSGLENGTH_AESERROR == PayLoadLength) && (*(pBuffer+1) == WMBUS_MSGID_AES_DECRYPTIONERROR)) {
+printf("A"); 
+           if((WMBUS_MSGLENGTH_AESERROR == PayLoadLength) && (*(pBuffer+1) == WMBUS_MSGID_AES_DECRYPTIONERROR)) {
+printf("B"); 
                 RFData.pktInfo=PACKET_DECRYPTIONERROR;
             } else {
                 if(stick == iM871AIdentifier) {
@@ -963,7 +965,9 @@ void GetDataFromStick(unsigned long handle, uint16_t stick, uint16_t infoflag) {
                         RFData.pktInfo = PACKET_WAS_ENCRYPTED;
                 }
                 RFData.valDuringErrState = (DIF & APL_DIF_FUNCTIONFIELD) == APL_DIF_FUNC_ERROR;
+printf("C"); 
                 if(APL_VIF_ENERGY_WH == (VIF & APL_VIF_UNITCODE)) {
+printf("D"); 
                     RFData.exp = (VIF&0x07)-3;
 
                     if(APL_DIF_DATA_FIELD_32_INT == (DIF & APL_DIF_DATAFIELD))
@@ -975,7 +979,8 @@ void GetDataFromStick(unsigned long handle, uint16_t stick, uint16_t infoflag) {
                     }
                 }
                 if(APL_VIF_VOLUME_M3 == (VIF & APL_VIF_UNITCODE)) {
-                    RFData.exp = (VIF&0x07)-6;
+ printf("E"); 
+                   RFData.exp = (VIF&0x07)-6;
                     if(APL_DIF_DATA_FIELD_32_INT == (DIF & APL_DIF_DATAFIELD))
                         RFData.value = *((unsigned long *)(pBuffer+Offset));
                     if(APL_DIF_DATA_FIELD_12_BCD == (DIF & APL_DIF_DATAFIELD)) {
@@ -1006,7 +1011,10 @@ void GetDataFromStick(unsigned long handle, uint16_t stick, uint16_t infoflag) {
                 }
             }
         } else {
-            //iPayLoadLength show a encrypted message
+ printf("F"); 
+           RFData.exp = (VIF&0x07)-6;
+           RFData.value = *((unsigned long *)(pBuffer+Offset));
+           //iPayLoadLength show a encrypted message
             if(!bIsDecrypted) {
                 RFData.pktInfo = PACKET_DECRYPTIONERROR;
             }
