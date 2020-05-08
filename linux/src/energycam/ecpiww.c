@@ -44,7 +44,7 @@ int Log2CSVFile(const char *path,  double Value) {
         if (FileSize == 0)  //start a new file with Header
             fprintf(hFile, "Date, Value \n");
         fprintf(hFile,"%d-%02d-%02d %02d:%02d, %.1f\n", tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, Value);
-        fclose(hFile);
+       fclose(hFile);
     } else
         return APIERROR;
 
@@ -53,73 +53,6 @@ int Log2CSVFile(const char *path,  double Value) {
 
 static struct termios orig_term_attr;
 
-// Save current stdin setting for later restore
-void saveStdin() {
-    /* Make sure stdin is a terminal. */
-    if (!isatty (STDIN_FILENO)) {
-      fprintf (stderr, "Not a terminal.\n");
-      exit (EXIT_FAILURE);
-    }
-
-    /* set the terminal to raw mode */
-    tcgetattr(fileno(stdin), &orig_term_attr);
-}
-
-// Restore stdin on exit
-void restoreStdin(void) {
-    /* restore the original terminal attributes */
-    tcsetattr(fileno(stdin), TCSANOW, &orig_term_attr);
-}
-
-// setup the stdin stream to read a character without blocking
-void setupStdin(void) {
-    struct termios new_term_attr;
-
-    tcgetattr(fileno(stdin), &new_term_attr);
-    new_term_attr.c_lflag &= ~(ECHO|ICANON);
-    new_term_attr.c_cc[VTIME] = 0;
-    new_term_attr.c_cc[VMIN]  = 0;
-    tcsetattr(fileno(stdin), TCSANOW, &new_term_attr);
-}
-
-// By default, stdout is line buffered, stderr is none buffered and file is completely buffered.
-// Make stdout unbuffered which allows to output partial lines
-void setupStdout(void) {
-    setbuf(stdout, NULL); // stdout is restored on program exit automatically
-}
-
-void intHandler(int signal) {
-    exit(1); // calls exit handler which is set by atexit()
-}
-
-// setup the stdin stream to read a character without blocking
-void setupConsole(void) {
-    saveStdin();
-    setupStdin();
-    setupStdout();
-    atexit(restoreStdin); // setup callback to restore console on exit
-
-    // Register a signal handel which catch CTRL-C which stops the program and restore the console
-    struct sigaction act;
-    act.sa_handler = intHandler;
-    sigaction(SIGINT, &act, NULL);
-}
-
-// Returns EOF (-1) if no character is available
-signed char getkey(void) {
-    char character = -1;
-    if (read (STDIN_FILENO, &character, 1) <= 0)
-        character = -1;
-    return character;
-}
-
-// Return true when something different from only '\n' has been enterred
-bool getLine(char* inputBuf, int inputBufSize) {
-    restoreStdin();
-    (void)fgets(inputBuf, inputBufSize, stdin);
-    setupStdin();
-    return inputBuf[0] != '\n';
-}
 
 static int iTime;
 static int iMinute;
@@ -150,25 +83,6 @@ int IsNewMinute(void) {
         return 1;
     }
     return 0;
-}
-
-void Intro(void) {
-    printf("   \n");
-    Colour(62, false);
-    printf("################################################################\n");
-    printf("## ecpiww - EnergyCam/wM-Bus Stick on raspberry Pi/cubieboard ##\n");
-    printf("################################################################\n");
-    Colour(0, true);
-    printf("   Usage\n");
-    printf("   h   : Help (this screen)\n");
-    printf("   s   : Use S2 mode\n");
-    printf("   t   : Use T2 mode\n");
-    printf("   a   : Add meter\n");
-    printf("   r   : Remove meter\n");
-    printf("   l   : List meters\n");
-    printf("   u   : Update - check for data\n");
-    printf("   q   : Quit\n");
-    printf("   \n");
 }
 
 void IntroShowParam(void) {
@@ -493,8 +407,6 @@ int main(int argc, char *argv[]) {
     char     comDeviceName[100];
     int      hStick;
 
-    setupConsole();
-
     ecwMBUSMeter ecpiwwMeter[MAXMETER];
     memset(ecpiwwMeter, 0, MAXMETER*sizeof(ecwMBUSMeter));
 
@@ -509,9 +421,7 @@ int main(int argc, char *argv[]) {
         fclose(hDatFile);
     }
 
-    Intro();
-
-    //open wM-Bus Stick #1
+   //open wM-Bus Stick #1
     wMBUSStick = iM871AIdentifier;
     if (strlen(DevicePath))
         sprintf(comDeviceName, "%s", DevicePath);
@@ -519,12 +429,6 @@ int main(int argc, char *argv[]) {
         sprintf(comDeviceName, "/dev/ttyUSB%d", Port);
 
     hStick = wMBus_OpenDevice(comDeviceName, wMBUSStick);
-
-    if(hStick <= 0) { //try 2.Stick
-        wMBUSStick = iAMB8465Identifier;
-        usleep(500*1000);
-        hStick = wMBus_OpenDevice(comDeviceName, wMBUSStick);
-    }
 
     if(hStick <= 0) {
          ErrorAndExit("wM-Bus Stick not found\n");
@@ -536,20 +440,7 @@ int main(int argc, char *argv[]) {
         }
     } else {
         wMBus_CloseDevice(hStick, wMBUSStick);
-        //try 2. Stick
-        wMBUSStick = iAMB8465Identifier;
-        hStick = wMBus_OpenDevice(comDeviceName,wMBUSStick);
-        if((iAMB8465Identifier == wMBUSStick) && (APIOK == wMBus_GetStickId(hStick, wMBUSStick, &ReturnValue, InfoFlag)) && (0 != ReturnValue)) {
-            if((iAMB8465Identifier == ReturnValue) && (InfoFlag > SILENTMODE)) {
-                printf("Amber 8465-M found ");
-            }
-            if((iAMB8665Identifier == ReturnValue) && (InfoFlag > SILENTMODE)) {
-                printf("Amber 8665-M found ");
-            }
-        } else {
-            wMBus_CloseDevice(hStick, wMBUSStick);
-            ErrorAndExit("wM-Bus Stick not found\n");
-        }
+        ErrorAndExit("wM-Bus Stick not found\n");
     }
 
     if(APIOK == wMBus_GetRadioMode(hStick, wMBUSStick, &ReturnValue, InfoFlag)) {
@@ -572,95 +463,8 @@ int main(int argc, char *argv[]) {
     while (true) {
         usleep(500*1000);       //sleep 500ms
 
-        key = getkey();
 
-        if (key == 'a') {       //add a new Meter
-            iX=0;
-            while(0 != ecpiwwMeter[iX].manufacturerID) {
-                iX++;
-                if(iX == MAXMETER-1)
-                  continue;
-              }
-            //check entry in list of meters
-            if(iX < MAXMETER) {
-                printf("\nAdding Meter #%d \n",iX+1);
-                printf("Enter Meter Ident (12345678): ");
-                if(getLine(KeyInput, _MAX_PATH))
-                    ecpiwwMeter[iX].ident=CalcUIntBCD(atoi(KeyInput));
-
-                printf("Enter Meter Type (2 = Electricity ; 3 = Gas ; 7 = Water) : ");
-                if(getLine(KeyInput, _MAX_PATH)) {
-                    switch(atoi(KeyInput)) {
-                        case METER_GAS  :        ecpiwwMeter[iX].type = METER_GAS;          break;
-                        case METER_WATER:        ecpiwwMeter[iX].type = METER_WATER;        break;
-                        default: printf(" - wrong Type ; default to Electricity");
-                        case METER_ELECTRICITY : ecpiwwMeter[iX].type = METER_ELECTRICITY;  break;
-                    }
-                }
-                ecpiwwMeter[iX].manufacturerID = FASTFORWARD;
-                ecpiwwMeter[iX].version        = 0x01;
-
-                printf("Enter Key (0 = Zero ; 1 = Default ; 2 = Enter the 16 Bytes) : ");
-                if(getLine(KeyInput, _MAX_PATH)) {
-                    switch(atoi(KeyInput)) {
-                        case 0  : for(iK = 0; iK<AES_KEYLENGHT_IN_BYTES; iK++)
-                                    ecpiwwMeter[iX].key[iK] = 0;
-                        break;
-
-                        default:
-                        case 1  : for(iK = 0; iK<AES_KEYLENGHT_IN_BYTES; iK++)
-                                    ecpiwwMeter[iX].key[iK] = (uint8_t)(0x1C + 3*iK);
-                        break;
-
-                        case 2  :
-                                printf("Key:");
-                                getLine(KeyInput, _MAX_PATH);
-                                    for(iK = 0; iK<AES_KEYLENGHT_IN_BYTES; iK++)
-                                        ecpiwwMeter[iX].key[iK] = 0;
-                                if((strlen(KeyInput)-1) < AES_KEYLENGHT_IN_BYTES*2)
-                                    printf("Key is too short - default to Zero\n");
-                                else {
-                                    memset(Key,0,sizeof(Key));
-                                    for(iK = 0; iK<(int)(strlen(KeyInput)-1)/2; iK++) {
-                                        Key[0] =  KeyInput[2*iK];
-                                        Key[1] =  KeyInput[2*iK+1];
-                                        ecpiwwMeter[iX].key[iK] = (uint8_t) strtoul(Key, NULL, 16);
-                                    }
-                                }
-                        break;
-                    }
-                }
-
-                Meters++;
-                Meters = min(Meters, MAXMETER);
-                DisplayListofMeters(Meters, ecpiwwMeter);
-                UpdateMetersonStick(hStick, wMBUSStick, Meters, ecpiwwMeter, InfoFlag);
-            } else
-                printf("All %d Meters defined\n", MAXMETER);
-
-        } else if(key == 'l') {  // display list of meters
-            DisplayListofMeters(Meters, ecpiwwMeter);
-
-        } else if(key == 'r') { //remove a meter from the list
-            printf("Enter Meterindex to remove: ");
-            if(getLine(KeyInput, _MAX_PATH)) {
-                iX = atoi(KeyInput);
-                if(iX-1 <= Meters-1) {
-                    printf("Remove Meter #%d\n",iX);
-                    memset(&ecpiwwMeter[iX-1], 0, sizeof(ecwMBUSMeter));
-                    DisplayListofMeters(Meters, ecpiwwMeter);
-                    UpdateMetersonStick(hStick, wMBUSStick, Meters, ecpiwwMeter, InfoFlag);
-                 }
-                 else
-                    printf("Index not defined\n");
-            }
-        } else if(key == 's') {  // switch to S2 mode
-            wMBus_SwitchMode( hStick,wMBUSStick, RADIOS2,InfoFlag);
-
-        } else if(key == 't') {  // switch to T2 mode
-            wMBus_SwitchMode( hStick,wMBUSStick, RADIOT2,InfoFlag);
-
-        } else if (IsNewMinute() || (key == 'u')) { //check whether there are new data from the EnergyCams
+        if (IsNewMinute()) { //check whether there are new data from the EnergyCams
             if(wMBus_GetMeterDataList() > 0) {
                 iCheck = 0;
                 for(iX=0; iX<Meters; iX++) {
@@ -708,16 +512,8 @@ int main(int argc, char *argv[]) {
                   if((++iCheck % 20) == 0) printf("\n");
                 }
             }
-        } else if (key == '\e' || key == 'q') { // '\e' = ESC = 0x1B
-            break;
-        } else if(key == 'h') {
-            Intro();
-        } else if (key > 0) {
-            printf("\n***Unknown command >%c<\n", key);
-            Intro();
         }
-        key = -1; // destroy key
-
+ 
     } // end while
 
     if(hStick >0) wMBus_CloseDevice(hStick, wMBUSStick);
